@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: recomendaciones-backend
+    env: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: node index.js
+    rootDir: backend
+    envVars:
+      - key: MONGO_URI
+        value: MONGO_URI=mongodb+srv://mejiadulce742:zSC0nULjMFjpXV37@cluster0.ymd9aiq.mongodb.net/cecyflix?retryWrites=true&w=majority&appName=Cluster0
+      - key: OPENROUTER_API_KEY
+        value: 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

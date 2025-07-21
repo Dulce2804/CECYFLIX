@@ -1,112 +1,108 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
-import peliculas from './data/peliculas.json';
+import FormularioAgregar from './components/FormularioAgregar';
 
 function App() {
-  const [input, setInput] = useState('');
-  const [peliculasFiltradas, setPeliculasFiltradas] = useState(peliculas);
-  const [recomendacionIA, setRecomendacionIA] = useState('');
-  const [peliculasRecomendadas, setPeliculasRecomendadas] = useState([]);
+  const [peliculas, setPeliculas] = useState([]);
+  const [peliculasFiltradas, setPeliculasFiltradas] = useState([]);
+  const [busqueda, setBusqueda] = useState('');
+  const [modoDescripcion, setModoDescripcion] = useState(false);
+  const [recomendacion, setRecomendacion] = useState('');
 
-  const handleBuscarTexto = () => {
-    const texto = input.toLowerCase();
-    const filtradas = peliculas.filter((peli) =>
-      peli.titulo.toLowerCase().includes(texto) ||
-      peli.genero.toLowerCase().includes(texto) ||
-      peli.titulo.toLowerCase().startsWith(texto)
+  useEffect(() => {
+  fetch('https://cecyflix-mee9.onrender.com')
+    .then(res => res.json())
+    .then(data => {
+      console.log('📦 Datos recibidos:', data); // ← agrega esto
+      setPeliculas(data);
+      setPeliculasFiltradas(data);
+    })
+    .catch(err => console.error('Error al obtener películas:', err));
+}, []);
+
+
+  const handleBuscar = (e) => {
+    e.preventDefault();
+    const texto = busqueda.toLowerCase();
+
+    const resultado = peliculas.filter(p =>
+      p.titulo.toLowerCase().includes(texto) ||
+      p.genero.toLowerCase().includes(texto) ||
+      p.titulo.toLowerCase().startsWith(texto)
     );
-    setPeliculasFiltradas(filtradas);
-    setPeliculasRecomendadas([]);
-    setRecomendacionIA('');
+
+    setPeliculasFiltradas(resultado);
+    setRecomendacion('');
   };
 
-  const handleBuscarDescripcion = async () => {
-    setRecomendacionIA('Pensando...');
-    setPeliculasRecomendadas([]);
-    setPeliculasFiltradas([]);
+  const handleBuscarPorDescripcion = async () => {
     try {
-      const response = await fetch('/api/recomendaciones', {
+      const res = await fetch('http://localhost:4000/api/recomendaciones', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `Tengo una base de datos con estas películas:
-${peliculas.map(p => p.titulo).join(', ')}.
-Quiero que me digas solo los títulos de las películas que coincidan con esta
-descripción: "${input}".
-Devuélveme únicamente los títulos separados por comas.`
-        }),
+          prompt: `Dame una recomendación basada en esta descripción:
+          ${busqueda}. Usa solo películas de este catálogo:
+          ${peliculas.map(p => p.titulo).join(', ')}.`
+        })
       });
-      const data = await response.json();
-      const textoIA = data.recomendacion.toLowerCase();
-      setRecomendacionIA(data.recomendacion);
-      const coincidencias = peliculas.filter((peli) =>
-        textoIA.includes(peli.titulo.toLowerCase())
+
+      const data = await res.json();
+      setRecomendacion(data.recomendacion);
+
+      const seleccionadas = peliculas.filter(p =>
+        data.recomendacion.toLowerCase().includes(p.titulo.toLowerCase())
       );
-      setPeliculasRecomendadas(coincidencias);
+
+      if (seleccionadas.length > 0) {
+        setPeliculasFiltradas(seleccionadas);
+      }
     } catch (err) {
-      setRecomendacionIA('❌ Error al obtener recomendación IA.');
+      console.error('Error con IA:', err);
     }
   };
 
   return (
     <div className="App">
-      <h1 className="titulo">CECYFLIX</h1>
-      <div className="buscador">
+      <h1>CineVerse</h1>
+<FormularioAgregar onAgregar={() => window.location.reload()} />
+
+      <form className="buscador" onSubmit={handleBuscar}>
         <input
           type="text"
-          placeholder="¿Qué te gustaría ver hoy?"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          required
+          placeholder={modoDescripcion ? 'Describe la peli que buscas...' : 'Busca por título o género'}
+          value={busqueda}
+          onChange={e => setBusqueda(e.target.value)}
         />
-        <button onClick={handleBuscarTexto}>Buscar</button>
-        <button onClick={handleBuscarDescripcion} className="btn-ia">
-          Buscar por descripción
+        {modoDescripcion ? (
+          <button type="button" onClick={handleBuscarPorDescripcion}>Buscar por descripción</button>
+        ) : (
+          <button type="submit">Buscar</button>
+        )}
+        <button type="button" onClick={() => setModoDescripcion(!modoDescripcion)}>
+          {modoDescripcion ? '🔄 Búsqueda clásica' : '🧠 IA'}
         </button>
-      </div>
+      </form>
 
-      {recomendacionIA && (
+      {recomendacion && (
         <div className="bloque-recomendaciones">
-          <h2>✨ Recomendación IA</h2>
-          <p>{recomendacionIA}</p>
+          <h2>IA sugiere:</h2>
+          <p>{recomendacion}</p>
         </div>
       )}
 
-      {peliculasRecomendadas.length > 0 && (
-        <div className="galeria">
-          <h2>🎞 Películas recomendadas por IA</h2>
-          <div className="grid">
-            {peliculasRecomendadas.map((peli) => (
-              <div className="tarjeta" key={peli.id}>
-                <img src={peli.poster} alt={peli.titulo} />
-                <div className="info">
-                  <h3>{peli.titulo}</h3>
-                  <p>{peli.descripcion}</p>
-                  <span>{peli.genero}</span>
-                </div>
-              </div>
-            ))}
+      <div className="grid">
+       {Array.isArray(peliculasFiltradas) && peliculasFiltradas.map((p, i) => (
+          <div className="tarjeta" key={i}>
+            <img src={p.poster} alt={p.titulo} />
+            <div className="info">
+              <h3>{p.titulo}</h3>
+              <p>{p.genero}</p>
+              <span>{p.descripcion?.slice(0, 60)}...</span>
+            </div>
           </div>
-        </div>
-      )}
-
-      {peliculasFiltradas.length > 0 && (
-        <div className="galeria">
-          <h2>🎬 Todas las películas</h2>
-          <div className="grid">
-            {peliculasFiltradas.map((peli) => (
-              <div className="tarjeta" key={peli.id}>
-                <img src={peli.poster} alt={peli.titulo} />
-                <div className="info">
-                  <h3>{peli.titulo}</h3>
-                  <p>{peli.descripcion}</p>
-                  <span>{peli.genero}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
   );
 }
